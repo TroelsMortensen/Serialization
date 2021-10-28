@@ -7,6 +7,6 @@ public class XMLserializer {
     }
 
     public static <T> T toObject(String s, Class<T> type) {
-        return new ObjectCreator<T>().toObject(s, type);
+        return new ObjectCreator().toObject(s, type);
     }
 }

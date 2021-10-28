@@ -3,10 +3,8 @@ package trmo.serialization.testobjects;
 public class City {
     private String name;
     private String postalCode;
-
-    public City(String name, String postalCode) {
-        this.name = name;
-        this.postalCode = postalCode;
+    private int numOfCitizens;
+    public City() {
     }
 
     public String getName() {
@@ -23,5 +21,13 @@ public class City {
 
     public void setPostalCode(String postalCode) {
         this.postalCode = postalCode;
+    }
+
+    public int getNumOfCitizens() {
+        return numOfCitizens;
+    }
+
+    public void setNumOfCitizens(int numOfCitizens) {
+        this.numOfCitizens = numOfCitizens;
     }
 }

@@ -154,6 +154,15 @@ class XMLserializerTest {
                 "</value>";
         s = strip(s);
         String result = XMLserializer.toObject(s, String.class);
+        int stopher = 0;
+    }
+
+    @Test
+    public void testString(){
+        String expected = "Hello world";
+        String xml = XMLserializer.toXML(expected);
+        String actual = XMLserializer.toObject(xml, String.class);
+        assertEquals(expected, actual);
     }
 
     @Test
@@ -253,12 +262,56 @@ class XMLserializerTest {
     }
 
     @Test
+    public void testBoolean(){
+        Boolean b = false;
+        String xml1 = XMLserializer.toXML(b);
+        Boolean actual1 = XMLserializer.toObject(xml1, Boolean.class);
+        assertEquals(b, actual1);
+
+        Boolean b1 = true;
+        String xml2 = XMLserializer.toXML(b1);
+        Boolean actual2 = XMLserializer.toObject(xml2, Boolean.class);
+        assertEquals(b1, actual2);
+    }
+
+    @Test
+    public void testDouble(){
+        Double expected = 123.145;
+        String xml = XMLserializer.toXML(expected);
+        Double actual = XMLserializer.toObject(xml, Double.class);
+        assertEquals(expected, actual);
+    }
+
+    @Test
     public void testOnlyInt(){
         Integer expected = 7;
         String xml = XMLserializer.toXML(expected);
+        System.out.println(xml);
         Integer actual = XMLserializer.toObject(xml, int.class);
         assertEquals(expected.intValue(), actual.intValue());
     }
 
-    // TODO: 28/10/2021 check primitive wrappers
+    @Test
+    public void testboolean(){
+        boolean b = false;
+        String xml1 = XMLserializer.toXML(b);
+        boolean actual1 = XMLserializer.toObject(xml1, boolean.class);
+        assertEquals(b, actual1);
+
+        boolean b1 = true;
+        String xml2 = XMLserializer.toXML(b1);
+        boolean actual2 = XMLserializer.toObject(xml2, boolean.class);
+        assertEquals(b1, actual2);
+    }
+
+    @Test
+    public void testArrayListOfStrings(){
+        List<String> strings = Arrays.asList("hello", "world", "how", "are", "you");
+        String xml = XMLserializer.toXML(strings);
+        System.out.println(xml);
+        List<String> result = XMLserializer.toList(xml, String.class);
+        strings.getClass().getName();
+
+    }
+
 }

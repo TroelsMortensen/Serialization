@@ -1,10 +1,14 @@
 package trmo.serialization.xml;
 
+import jdk.jshell.execution.Util;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -16,31 +20,23 @@ class ObjectCreator {
     public <T> T toObject(String xml, Class<T> type) {
         this.xml = xml.replace("\n", "").replace("\t", "");
         charIdx = 0;
-        String firstTag = nextStartTag();
-        if (!firstTag.equals("?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\" ?")) {
+        TagInfo firstTag = nextStartTag();
+        if (!firstTag.tag.equals("?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\" ?")) {
             throw new RuntimeException("Correct XML header not found");
         }
 
         if (type.isAssignableFrom(String.class)) {
-            String valueTag = nextStartTag();
-            String value = parseValue("value");
-            try {
-                Class<?> aClass = Class.forName(type.getName());
-                Constructor<?> constructor = aClass.getConstructor(type);
-                T o = (T) constructor.newInstance(value);
-                return o;
-            } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
-                e.printStackTrace();
-                throw new RuntimeException(e);
-            }
+            return handlePrimitive(type);
         } else if (type.isPrimitive()) {
-            throw new RuntimeException("Cannot deserialize to primitive types. Instead use their wrapper classes, e.g. Integer or Boolean");
+            return handlePrimitive(type);
+        } else if (Utils.isWrapper(type)) {
+            return handlePrimitive(type);
         } else if (type.isArray()) {
-
+            throw new RuntimeException("Cannot deserialize a collection. Use method XMLSerializer.toList() instead");
         } else if (type.isEnum()) {
 
-        } else if (Collection.class.isAssignableFrom(type)) {
-
+        } else if (List.class.isAssignableFrom(type)) {
+            throw new RuntimeException("Cannot deserialize a collection. Use method XMLSerializer.toList() instead");
         } else if (Object.class.isAssignableFrom(type)) {
             T t = startOnObject(type);
             return t;
@@ -49,42 +45,92 @@ class ObjectCreator {
         throw new RuntimeException("Class type " + type.getTypeName() + " not supported");
     }
 
-    private <T> T startOnObject(Class<T> typeToReturn) {
-        String rootTypeTag = nextStartTag();
-        Map<String, String> rootAttributes = getAttributes(rootTypeTag);
-        String tagType = rootTypeTag.split(" ")[0];
-        if ("object".equals(tagType)) {
-            return handleObject(typeToReturn, rootAttributes);
-        } else if ("value".equals(rootTypeTag)) {
-            // return type.
+    public <T> List<T> toList(String xml, Class<T> elementType) {
+        this.xml = xml.replace("\n", "").replace("\t", "");
+        charIdx = 0;
+        TagInfo firstTag = nextStartTag();
+        if (!firstTag.tag.equals("?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\" ?")) {
+            throw new RuntimeException("Correct XML header not found");
         }
         return null;
     }
 
-    private <T> T handleObject(Class<T> typeToReturn, Map<String, String> rootAttributes) {
+    private <T> T handlePrimitive(Class<?> type) {
+        String wrapperTypeName = type.getName();
+        if (type.isPrimitive()) {
+            wrapperTypeName = convertFromPrimitiveTypeToWrapper(type.getName());
+        }
+        TagInfo valueTag = nextStartTag();
+        String value = parseValue("value");
+
+        try {
+            Class<?> aClass = Class.forName(wrapperTypeName);
+            Constructor<?> constructor = aClass.getConstructor(String.class);
+            T o = (T) constructor.newInstance(value);
+            return o;
+        } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String convertFromPrimitiveTypeToWrapper(String name) {
+        switch (name) {
+            case "boolean":
+                return "java.lang.Boolean";
+            case "int":
+                return "java.lang.Integer";
+            case "double":
+                return "java.lang.Double";
+            case "float":
+                return "java.lang.Float";
+            case "char":
+                return "java.lang.Character";
+            case "long":
+                return "java.lang.Long";
+            case "short":
+                return "java.lang.Short";
+            case "byte":
+                return "java.lang.Byte";
+        }
+        throw new RuntimeException("Could not convert primitive to wrapper type, from " + name);
+    }
+
+    private <T> T startOnObject(Class<T> typeToReturn) {
+        TagInfo tagInfo = nextStartTag();
+//        Map<String, String> rootAttributes = getAttributes(rootTypeTag);
+//        String tagType = rootTypeTag.split(" ")[0];
+        if ("object".equals(tagInfo.tagType)) {
+            return handleObject(typeToReturn);
+        }
+        throw new RuntimeException("Error here. Asked for object, but that's not the root object");
+    }
+
+    private <T> T handleObject(Class<T> typeToReturn) {
         T objResult = createObjectOfType(typeToReturn);
         while (true) {
-            String fieldVariableTag = nextStartTag();
-            Map<String, String> attributes = getAttributes(fieldVariableTag);
-            String fieldTagType = fieldVariableTag.split(" ")[0];
+            TagInfo objTag = nextStartTag();
+//            Map<String, String> attributes = getAttributes(fieldVariableTag);
+//            String fieldTagType = fieldVariableTag.split(" ")[0];
 
-            if ("value".equals(fieldTagType)) {
-                String fieldValue = parseValue(fieldTagType);
-                Field match = findField(objResult, attributes);
+            if ("value".equals(objTag.tagType)) {
+                // TODO: 28/10/2021 use the handlePrimitive method here instead?
+                String fieldValue = parseValue(objTag.tagType);
+                Field match = findField(objResult, objTag.attributes);
                 match.setAccessible(true);
                 setPrimitiveOnField(match, objResult, fieldValue);
-                
-            } else if("object".equals(fieldTagType)){
-                Field field = findField(objResult, attributes);
+
+            } else if ("object".equals(objTag.tagType)) {
+                Field field = findField(objResult, objTag.attributes);
                 field.setAccessible(true);
-                Object o = handleObject(field.getType(), attributes);
+                Object o = handleObject(field.getType());
                 try {
                     field.set(objResult, o);
                 } catch (IllegalAccessException e) {
                     throw new RuntimeException("Error setting field " + field.getName() + " on object " + objResult.getClass().getName());
                 }
-                
-            } else if("collection".equals(fieldTagType)){
+
+            } else if ("collection".equals(objTag.tagType)) {
                 // TODO: 28/10/2021 fix this
             }
 
@@ -256,11 +302,11 @@ class ObjectCreator {
         return null;
     }
 
-    private String nextStartTag() {
+    private TagInfo nextStartTag() {
 
         boolean isInTag = false;
         boolean isTagContent = false;
-        String s = "";
+        String tag = "";
         while (true) {
             if (xml.charAt(charIdx) == '<') {
                 isInTag = true;
@@ -269,10 +315,15 @@ class ObjectCreator {
                 charIdx++;
                 break;
             } else {
-                s += xml.charAt(charIdx);
+                tag += xml.charAt(charIdx);
             }
             charIdx++;
         }
-        return s;
+
+        Map<String, String> attributes = getAttributes(tag);
+        String tagType = tag.split(" ")[0];
+        return new TagInfo(tag, tagType, attributes);
     }
+
+
 }

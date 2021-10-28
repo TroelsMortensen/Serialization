@@ -43,9 +43,8 @@ class XMLCreator {
         } else if (Object.class.isAssignableFrom(type)) {
             printComplex(obj, indents, type, fieldName);
         }
+        // TODO: 28/10/2021 map collections?
     }
-
-
 
     private void printComplex(Object obj, int indents, Class<?> type, String fieldName) {
         sb.append(indents(indents)).append("<object name=\"" + fieldName + "\" type=\"" + type.getName() + "\">").append("\n");

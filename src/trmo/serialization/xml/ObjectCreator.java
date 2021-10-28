@@ -22,7 +22,17 @@ class ObjectCreator {
         }
 
         if (type.isAssignableFrom(String.class)) {
-
+            String valueTag = nextStartTag();
+            String value = parseValue("value");
+            try {
+                Class<?> aClass = Class.forName(type.getName());
+                Constructor<?> constructor = aClass.getConstructor(type);
+                T o = (T) constructor.newInstance(value);
+                return o;
+            } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
         } else if (type.isPrimitive()) {
             throw new RuntimeException("Cannot deserialize to primitive types. Instead use their wrapper classes, e.g. Integer or Boolean");
         } else if (type.isArray()) {
@@ -32,26 +42,26 @@ class ObjectCreator {
         } else if (Collection.class.isAssignableFrom(type)) {
 
         } else if (Object.class.isAssignableFrom(type)) {
-            T t = start(type);
+            T t = startOnObject(type);
             return t;
         }
-        //readNextTag(type);
+
         throw new RuntimeException("Class type " + type.getTypeName() + " not supported");
     }
 
-    private <T> T start(Class<T> typeToReturn) {
+    private <T> T startOnObject(Class<T> typeToReturn) {
         String rootTypeTag = nextStartTag();
         Map<String, String> rootAttributes = getAttributes(rootTypeTag);
         String tagType = rootTypeTag.split(" ")[0];
         if ("object".equals(tagType)) {
-            return deserializeObject(typeToReturn, rootAttributes);
+            return handleObject(typeToReturn, rootAttributes);
         } else if ("value".equals(rootTypeTag)) {
             // return type.
         }
         return null;
     }
 
-    private <T> T deserializeObject(Class<T> typeToReturn, Map<String, String> rootAttributes) {
+    private <T> T handleObject(Class<T> typeToReturn, Map<String, String> rootAttributes) {
         T objResult = createObjectOfType(typeToReturn);
         while (true) {
             String fieldVariableTag = nextStartTag();
@@ -61,16 +71,21 @@ class ObjectCreator {
             if ("value".equals(fieldTagType)) {
                 String fieldValue = parseValue(fieldTagType);
                 Field match = findField(objResult, attributes);
-                if (match == null)
-                    throw new RuntimeException("Could not find field variable " + attributes.get("name") + " on object " + rootAttributes.get("type"));
                 match.setAccessible(true);
-                //  try {
-                //Object objectOfType = createPrimitive(match.getType(), fieldValue, match);
                 setPrimitiveOnField(match, objResult, fieldValue);
-                //match.set(objResult, objectOfType);
-                /*} catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                }*/
+                
+            } else if("object".equals(fieldTagType)){
+                Field field = findField(objResult, attributes);
+                field.setAccessible(true);
+                Object o = handleObject(field.getType(), attributes);
+                try {
+                    field.set(objResult, o);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException("Error setting field " + field.getName() + " on object " + objResult.getClass().getName());
+                }
+                
+            } else if("collection".equals(fieldTagType)){
+                // TODO: 28/10/2021 fix this
             }
 
             if (xml.charAt(charIdx) == '<' && xml.charAt(charIdx + 1) == '/') {
@@ -165,10 +180,10 @@ class ObjectCreator {
         for (Field field : fields) {
             if (field.getName().equals(attributes.get("name"))) {
                 match = field;
-                break;
+                return match;
             }
         }
-        return match;
+        throw new RuntimeException("Could not find field variable " + attributes.get("name") + " on object " + objResult.getClass().getName());
     }
 
     private Map<String, String> getAttributes(String rootTypeTag) {

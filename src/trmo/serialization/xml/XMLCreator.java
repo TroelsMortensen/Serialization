@@ -4,6 +4,8 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.Collection;
 
+import static trmo.serialization.xml.Utils.isWrapper;
+
 class XMLCreator {
 
     private StringBuilder sb;
@@ -20,12 +22,13 @@ class XMLCreator {
     private void printObject(Object obj, String fieldName, int indents) {
         Class<?> type = obj.getClass();
 
-        // TODO: 25/10/2021 wrapper types?
-
         if (type.isAssignableFrom(String.class)) {
             printSimple(obj, fieldName, indents);
 
         } else if (type.isPrimitive()) {
+            printSimple(obj, fieldName, indents);
+
+        } else if (isWrapper(type)) {
             printSimple(obj, fieldName, indents);
 
         } else if (type.isArray()) {
@@ -41,6 +44,8 @@ class XMLCreator {
             printComplex(obj, indents, type, fieldName);
         }
     }
+
+
 
     private void printComplex(Object obj, int indents, Class<?> type, String fieldName) {
         sb.append(indents(indents)).append("<object name=\"" + fieldName + "\" type=\"" + type.getName() + "\">").append("\n");

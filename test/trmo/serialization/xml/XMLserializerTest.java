@@ -217,4 +217,48 @@ class XMLserializerTest {
         assertEquals("Hello world", result.getString());
         assertEquals(783947593L, result.getLong());
     }
+
+    @Test
+    public void testNestedObjects(){
+        City city = new City();
+        city.setName("Horsens");
+        city.setPostalCode("8700");
+        city.setNumOfCitizens(57004);
+        Address address = new Address("somewhere", 11, city);
+        String xml = XMLserializer.toXML(address);
+        System.out.println(xml);
+        Address result = XMLserializer.toObject(xml, Address.class);
+        assertEquals("somewhere", address.getStreet());
+        assertEquals(11, address.getHouseNumber());
+        assertEquals("Horsens", address.getCity().getName());
+        assertEquals("8700", address.getCity().getPostalCode());
+        assertEquals(57004, address.getCity().getNumOfCitizens());
+    }
+
+    @Test
+    public void testOnlyString(){
+        String expected = "Hello world";
+        String s1 = XMLserializer.toXML(expected);
+        String actual = XMLserializer.toObject(s1, String.class);
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testOnlyInteger(){
+        Integer expected = 7;
+        String xml = XMLserializer.toXML(expected);
+        System.out.println(xml);
+        Integer actual = XMLserializer.toObject(xml, Integer.class);
+        assertEquals(expected.intValue(), actual.intValue());
+    }
+
+    @Test
+    public void testOnlyInt(){
+        Integer expected = 7;
+        String xml = XMLserializer.toXML(expected);
+        Integer actual = XMLserializer.toObject(xml, int.class);
+        assertEquals(expected.intValue(), actual.intValue());
+    }
+
+    // TODO: 28/10/2021 check primitive wrappers
 }
